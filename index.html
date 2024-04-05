@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>United States GDP</title>
+     <link rel="stylesheet" href="style.css">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+  </head>
+  <body>
+    <div id="chart-container"></div>
+
+    <script>
+      // Width and height of the chart
+      const margin = { top: 20, right: 20, bottom: 50, left: 50 };
+      const width = 800 - margin.left - margin.right;
+      const height = 400 - margin.top - margin.bottom;
+      const barWidth = width / 275;
+
+      // Create title
+      const title = d3
+        .select("#chart-container")
+        .append("h1")
+        .attr("id", "title")
+        .text("United States GDP");
+
+      // Create tooltip
+      const tooltip = d3
+        .select("#chart-container")
+        .append("div")
+        .attr("id", "tooltip")
+        .style("position", "absolute")
+        .style("background-color", "white")
+        .style("border", "solid")
+        .style("border-width", "1px")
+        .style("border-radius", "5px")
+        .style("padding", "5px")
+        .style("opacity", 0);
+
+      // Create SVG for the chart
+      const svg = d3
+        .select("#chart-container")
+        .append("svg")
+        .attr("id", "chart")
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", height + margin.top + margin.bottom)
+        .append("g")
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+      // Fetch data from API
+      d3.json(
+        "https://raw.githubusercontent.com/freeCodeCamp/ProjectReferenceData/master/GDP-data.json"
+      )
+        .then((data) => {
+          // Add legend
+          svg
+            .append("text")
+            .attr("transform", "rotate(-90)")
+            .attr("x", -200)
+            .attr("y", margin.left - 10)
+            .text("Gross Domestic Product");
+
+          // Create info
+          svg
+            .append("text")
+            .attr("x", margin.left)
+            .attr("y", height + margin.bottom)
+            .text(
+              "More Information: http://www.bea.gov/national/pdf/nipaguid.pdf"
+            )
+            .attr("class", "info");
+
+          // Get years from the data dates
+          const years = data.data.map(function (item) {
+            let quarter;
+            const temp = item[0].substring(5, 7);
+            // Divide years into quarters
+            if (temp === "01") {
+              quarter = "Q1";
+            } else if (temp === "04") {
+              quarter = "Q2";
+            } else if (temp === "07") {
+              quarter = "Q3";
+            } else if (temp === "10") {
+              quarter = "Q4";
+            }
+
+            return item[0].substring(0, 4) + " " + quarter;
+          });
+          const yearsDate = data.data.map(function (item) {
+            return new Date(item[0]);
+          });
+          // Get max value on x axis
+          const xMax = new Date(d3.max(yearsDate));
+          xMax.setMonth(xMax.getMonth() + 3);
+
+          // Create x scale
+          const xScale = d3
+            .scaleTime()
+            .domain([d3.min(yearsDate), xMax])
+            .range([0, width]);
+
+          // Create x-axis
+          const xAxis = d3.axisBottom().scale(xScale);
+
+          // Append x-axis to the chart
+          svg
+            .append("g")
+            .attr("id", "x-axis")
+            .attr("transform", "translate(0," + height + ")") // turn the axis
+            .call(xAxis);
+
+          // Get the GDP data
+          const GDP = data.data.map(function (item) {
+            return item[1];
+          });
+          let scaledGDP = [];
+          const gdpMax = d3.max(GDP);
+
+          // Create y scale
+          const linearScale = d3
+            .scaleLinear()
+            .domain([0, gdpMax])
+            .range([0, height]);
+
+          // Get scaled GDP data
+          scaledGDP = GDP.map(function (item) {
+            return linearScale(item);
+          });
+          const yAxisScale = d3
+            .scaleLinear()
+            .domain([0, gdpMax])
+            .range([height, 0]);
+          // Create y axis
+          const yAxis = d3.axisLeft(yAxisScale);
+
+          // Append y-axis to the chart
+          svg.append("g").call(yAxis).attr("id", "y-axis");
+
+          // Create bars
+          d3.select("svg")
+            .selectAll("rect")
+            .data(scaledGDP)
+            .enter()
+            .append("rect")
+            .attr("data-date", function (d, i) {
+              return data.data[i][0];
+            })
+            .attr("data-gdp", function (d, i) {
+              return data.data[i][1];
+            })
+            .attr("class", "bar")
+            .attr("x", (d, i) => {
+              return margin.left + xScale(yearsDate[i]);
+            })
+            .attr("y", (d) => {
+              return height - d + margin.top;
+            })
+            .attr("width", barWidth)
+            .attr("height", (d) => d)
+            .attr("index", (d, i) => i)
+            .style("fill", "navy")
+
+            // Style tooltip
+            .on("mouseover", function (event, d) {
+              // d is the height of current rect
+              let i = this.getAttribute("index");
+              tooltip.transition().duration(200).style("opacity", 0.9);
+              // Text for the tooltip and some complicated regex
+              tooltip
+                .html(
+                  years[i] +
+                    "<br>" +
+                    "$" +
+                    GDP[i].toFixed(1).replace(/(\d)(?=(\d{3})+\.)/g, "$1,") +
+                    " Billion"
+                )
+                .attr("data-date", data.data[i][0])
+                .style("left", event.pageX + 10 + "px")
+                .style("top", event.pageY - 30 + "px");
+            })
+            // Hide tooltip on mouseout
+            .on("mouseout", () => {
+              tooltip.transition().duration(200).style("opacity", 0);
+            });
+
+          // End of json data
+        })
+        .catch((error) => {
+          console.error("Error fetching data:", error);
+        });
+    </script>
+    <script src="https://cdn.freecodecamp.org/testable-projects-fcc/v1/bundle.js"></script>
+  </body>
+</html>
